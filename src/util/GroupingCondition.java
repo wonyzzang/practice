@@ -1,5 +1,5 @@
 package util;
 
 public enum GroupingCondition {
-  AND, OR
+	AND, OR
 }

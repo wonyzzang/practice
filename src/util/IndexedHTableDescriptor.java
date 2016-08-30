@@ -11,99 +11,96 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 
 /**
- * IndexedHTabledDescriptor is extension of HTableDescriptor. This contains indices to specify index
- * name and column details. There can be one or more indices on one table. For each of the index on
- * the table and IndexSpecification is to be created and added to the indices.
+ * IndexedHTabledDescriptor is extension of HTableDescriptor. This contains
+ * indices to specify index name and column details. There can be one or more
+ * indices on one table. For each of the index on the table and
+ * IndexSpecification is to be created and added to the indices.
  */
 public class IndexedHTableDescriptor extends HTableDescriptor {
 
-  private static final Log LOG = LogFactory.getLog(IndexedHTableDescriptor.class);
+	private List<IndexSpecification> indices = new ArrayList<IndexSpecification>(1);
 
-  private List<IndexSpecification> indices = new ArrayList<IndexSpecification>(1);
+	public IndexedHTableDescriptor() {
 
-  public IndexedHTableDescriptor() {
+	}
 
-  }
+	public IndexedHTableDescriptor(String tableName) {
+		super(TableName.valueOf(tableName));
+	}
 
-  public IndexedHTableDescriptor(String tableName) {
-    super(tableName);
-  }
+	public IndexedHTableDescriptor(byte[] tableName) {
+		super(TableName.valueOf(tableName));
+	}
 
-  public IndexedHTableDescriptor(byte[] tableName) {
-    super(tableName);
-  }
+	/**
+	 * @param IndexSpecification
+	 *            to be added to indices
+	 * @throws IllegalArgumentException
+	 *             if duplicate indexes for same table
+	 */
+	public void addIndex(IndexSpecification iSpec) throws IllegalArgumentException {
+		String indexName = iSpec.getName();
+		if (null == indexName) {
+			throw new IllegalArgumentException();
+		}
 
-  /**
-   * @param IndexSpecification to be added to indices
-   * @throws IllegalArgumentException if duplicate indexes for same table
-   */
-  public void addIndex(IndexSpecification iSpec) throws IllegalArgumentException {
-    String indexName = iSpec.getName();
-    if (null == indexName) {
-      String message = "Index name should not be null in Index Specification.";
-      LOG.error(message);
-      throw new IllegalArgumentException(message);
-    }
-    if (true == StringUtils.isBlank(indexName)) {
-      String message = "Index name should not be blank in Index Specification.";
-      LOG.error(message);
-      throw new IllegalArgumentException(message);
-    }
-    if (indexName.length() > Constants.DEF_MAX_INDEX_NAME_LENGTH) {
-      String message =
-          "Index name length should not more than " + Constants.DEF_MAX_INDEX_NAME_LENGTH + '.';
-      LOG.error(message);
-      throw new IllegalArgumentException(message);
-    }
-    for (IndexSpecification is : indices) {
-      if (is.getName().equals(indexName)) {
-        String message = "Duplicate index names should not be present for same table.";
-        LOG.error(message);
-        throw new IllegalArgumentException(message);
-      }
-    }
-    indices.add(iSpec);
-  }
+		if (true == StringUtils.isBlank(indexName)) {
+			throw new IllegalArgumentException();
+		}
 
-  /**
-   * @return IndexSpecification list
-   */
-  public List<IndexSpecification> getIndices() {
-    return (new ArrayList<IndexSpecification>(this.indices));
-  }
+		if (indexName.length() > Constants.DEF_MAX_INDEX_NAME_LENGTH) {
+			throw new IllegalArgumentException();
+		}
 
-  /**
-   * @param DataOutput stream
-   */
-  public void write(DataOutput out) throws IOException {
-    super.write(out);
-    out.writeInt(this.indices.size());
-    for (IndexSpecification index : indices) {
-      index.write(out);
-    }
-  }
+		for (IndexSpecification is : indices) {
+			if (is.getName().equals(indexName)) {
+				throw new IllegalArgumentException();
+			}
+		}
+		indices.add(iSpec);
+	}
 
-  /**
-   * @param DataInput stream
-   * @throws IOException
-   */
-  public void readFields(DataInput in) throws IOException {
-    try {
-      super.readFields(in);
-      int indicesSize = in.readInt();
-      indices.clear();
-      for (int i = 0; i < indicesSize; i++) {
-        IndexSpecification is = new IndexSpecification();
-        is.readFields(in);
-        this.indices.add(is);
-      }
-    } catch (EOFException e) {
-      LOG.warn("Error reading feilds from the descriptor " + this.getNameAsString());
-      throw e;
-    }
+	/**
+	 * @return IndexSpecification list
+	 */
+	public List<IndexSpecification> getIndices() {
+		return (new ArrayList<IndexSpecification>(this.indices));
+	}
 
-  }
+	/**
+	 * @param DataOutput
+	 *            stream
+	 */
+	public void write(DataOutput out) throws IOException {
+		super.write(out);
+		out.writeInt(this.indices.size());
+		for (IndexSpecification index : indices) {
+			index.write(out);
+		}
+	}
+
+	/**
+	 * @param DataInput
+	 *            stream
+	 * @throws IOException
+	 */
+	public void readFields(DataInput in) throws IOException {
+		try {
+			super.readFields(in);
+			int indicesSize = in.readInt();
+			indices.clear();
+			for (int i = 0; i < indicesSize; i++) {
+				IndexSpecification is = new IndexSpecification();
+				is.readFields(in);
+				this.indices.add(is);
+			}
+		} catch (EOFException e) {
+			throw e;
+		}
+
+	}
 
 }

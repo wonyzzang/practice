@@ -2,8 +2,8 @@ package idxcop;
 
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 
-public interface IndexRegionScanner extends RegionScanner{
-	
+public interface IndexRegionScanner extends RegionScanner {
+
 	public void advance();
 
 	public void setRangeFlag(boolean range);

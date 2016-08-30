@@ -34,236 +34,231 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class IndexHFileOutputFormat extends FileOutputFormat<ImmutableBytesWritable, KeyValue> {
 
-  static Log LOG = LogFactory.getLog(IndexHFileOutputFormat.class);
-  static final String COMPRESSION_CONF_KEY = "hbase.hfileoutputformat.families.compression";
-  private static final String DATABLOCK_ENCODING_CONF_KEY =
-      "hbase.mapreduce.hfileoutputformat.datablock.encoding";
-  TimeRangeTracker trt = new TimeRangeTracker();
+	static Log LOG = LogFactory.getLog(IndexHFileOutputFormat.class);
+	static final String COMPRESSION_CONF_KEY = "hbase.hfileoutputformat.families.compression";
+	private static final String DATABLOCK_ENCODING_CONF_KEY = "hbase.mapreduce.hfileoutputformat.datablock.encoding";
+	TimeRangeTracker trt = new TimeRangeTracker();
 
-  public static void configureIncrementalLoad(Job job, HTable table) throws IOException {
-    HFileOutputFormat.configureIncrementalLoad(job, table);
-    // Override OutputFormatClass
-    job.setOutputFormatClass(IndexHFileOutputFormat.class);
-  }
+	public static void configureIncrementalLoad(Job job, HTable table) throws IOException {
+		HFileOutputFormat.configureIncrementalLoad(job, table);
+		// Override OutputFormatClass
+		job.setOutputFormatClass(IndexHFileOutputFormat.class);
+	}
 
-  public RecordWriter<ImmutableBytesWritable, KeyValue> getRecordWriter(
-      final TaskAttemptContext context) throws IOException, InterruptedException {
+	public RecordWriter<ImmutableBytesWritable, KeyValue> getRecordWriter(final TaskAttemptContext context)
+			throws IOException, InterruptedException {
 
-    // Get the path of the temporary output file
-    final Path outputPath = FileOutputFormat.getOutputPath(context);
-    final Path outputdir = new FileOutputCommitter(outputPath, context).getWorkPath();
+		// Get the path of the temporary output file
+		final Path outputPath = FileOutputFormat.getOutputPath(context);
+		final Path outputdir = new FileOutputCommitter(outputPath, context).getWorkPath();
 
-    final Configuration conf = context.getConfiguration();
-    final FileSystem fs = outputdir.getFileSystem(conf);
+		final Configuration conf = context.getConfiguration();
+		final FileSystem fs = outputdir.getFileSystem(conf);
 
-    // These configs. are from hbase-*.xml
-    final long maxsize =
-        conf.getLong(HConstants.HREGION_MAX_FILESIZE, HConstants.DEFAULT_MAX_FILE_SIZE);
-    final int blocksize =
-        conf.getInt("hbase.mapreduce.hfileoutputformat.blocksize", HFile.DEFAULT_BLOCKSIZE);
-    // Invented config. Add to hbase-*.xml if other than default compression.
-    final String defaultCompression =
-        conf.get("hfile.compression", Compression.Algorithm.NONE.getName());
-    final boolean compactionExclude =
-        conf.getBoolean("hbase.mapreduce.hfileoutputformat.compaction.exclude", false);
+		// These configs. are from hbase-*.xml
+		final long maxsize = conf.getLong(HConstants.HREGION_MAX_FILESIZE, HConstants.DEFAULT_MAX_FILE_SIZE);
+		final int blocksize = conf.getInt("hbase.mapreduce.hfileoutputformat.blocksize", HFile.DEFAULT_BLOCKSIZE);
+		// Invented config. Add to hbase-*.xml if other than default
+		// compression.
+		final String defaultCompression = conf.get("hfile.compression", Compression.Algorithm.NONE.getName());
+		final boolean compactionExclude = conf.getBoolean("hbase.mapreduce.hfileoutputformat.compaction.exclude",
+				false);
 
-    final boolean indexedTable = conf.getBoolean(IndexMapReduceUtil.INDEX_IS_INDEXED_TABLE, false);
+		final boolean indexedTable = conf.getBoolean(IndexMapReduceUtil.INDEX_IS_INDEXED_TABLE, false);
 
-    final Path indexDir = new Path(outputdir, IndexMapReduceUtil.INDEX_DATA_DIR);
+		final Path indexDir = new Path(outputdir, IndexMapReduceUtil.INDEX_DATA_DIR);
 
-    final FileSystem indexFs = indexDir.getFileSystem(conf);
+		final FileSystem indexFs = indexDir.getFileSystem(conf);
 
-    if (indexedTable) {
-      if (!indexFs.exists(indexDir)) {
-        indexFs.mkdirs(indexDir);
-      }
-    }
+		if (indexedTable) {
+			if (!indexFs.exists(indexDir)) {
+				indexFs.mkdirs(indexDir);
+			}
+		}
 
-    // create a map from column family to the compression algorithm
-    final Map<byte[], String> compressionMap = createFamilyCompressionMap(conf);
+		// create a map from column family to the compression algorithm
+		final Map<byte[], String> compressionMap = createFamilyCompressionMap(conf);
 
-    String dataBlockEncodingStr = conf.get(DATABLOCK_ENCODING_CONF_KEY);
-    final HFileDataBlockEncoder encoder;
-    if (dataBlockEncodingStr == null) {
-      encoder = NoOpDataBlockEncoder.INSTANCE;
-    } else {
-      try {
-        encoder = new HFileDataBlockEncoderImpl(DataBlockEncoding.valueOf(dataBlockEncodingStr));
-      } catch (IllegalArgumentException ex) {
-        throw new RuntimeException("Invalid data block encoding type configured for the param "
-            + DATABLOCK_ENCODING_CONF_KEY + " : " + dataBlockEncodingStr);
-      }
-    }
+		String dataBlockEncodingStr = conf.get(DATABLOCK_ENCODING_CONF_KEY);
+		final HFileDataBlockEncoder encoder;
+		if (dataBlockEncodingStr == null) {
+			encoder = NoOpDataBlockEncoder.INSTANCE;
+		} else {
+			try {
+				encoder = new HFileDataBlockEncoderImpl(DataBlockEncoding.valueOf(dataBlockEncodingStr));
+			} catch (IllegalArgumentException ex) {
+				throw new RuntimeException("Invalid data block encoding type configured for the param "
+						+ DATABLOCK_ENCODING_CONF_KEY + " : " + dataBlockEncodingStr);
+			}
+		}
 
-    return new RecordWriter<ImmutableBytesWritable, KeyValue>() {
-      // Map of families to writers and how much has been output on the writer.
-      private final Map<byte[], WriterLength> writers = new TreeMap<byte[], WriterLength>(
-          Bytes.BYTES_COMPARATOR);
-      private byte[] previousRow = HConstants.EMPTY_BYTE_ARRAY;
-      private final byte[] now = Bytes.toBytes(System.currentTimeMillis());
-      private boolean rollRequested = false;
+		return new RecordWriter<ImmutableBytesWritable, KeyValue>() {
+			// Map of families to writers and how much has been output on the
+			// writer.
+			private final Map<byte[], WriterLength> writers = new TreeMap<byte[], WriterLength>(Bytes.BYTES_COMPARATOR);
+			private byte[] previousRow = HConstants.EMPTY_BYTE_ARRAY;
+			private final byte[] now = Bytes.toBytes(System.currentTimeMillis());
+			private boolean rollRequested = false;
 
-      public void write(ImmutableBytesWritable row, KeyValue kv) throws IOException {
-        // null input == user explicitly wants to flush
-        if (row == null && kv == null) {
-          rollWriters();
-          return;
-        }
-        boolean indexed = false;
+			public void write(ImmutableBytesWritable row, KeyValue kv) throws IOException {
+				// null input == user explicitly wants to flush
+				if (row == null && kv == null) {
+					rollWriters();
+					return;
+				}
+				boolean indexed = false;
 
-        byte[] rowKey = kv.getRow();
-        long length = kv.getLength();
-        byte[] family = kv.getFamily();
-        byte[] qualifier = kv.getQualifier();
+				byte[] rowKey = kv.getRow();
+				long length = kv.getLength();
+				byte[] family = kv.getFamily();
+				byte[] qualifier = kv.getQualifier();
 
-        if (Bytes.equals(family, Constants.IDX_COL_FAMILY)
-            && Bytes.equals(qualifier, Constants.IDX_COL_QUAL)) {
-          indexed = true;
-        }
+				if (Bytes.equals(family, Constants.IDX_COL_FAMILY) && Bytes.equals(qualifier, Constants.IDX_COL_QUAL)) {
+					indexed = true;
+				}
 
-        WriterLength wl = null;
-        if (indexed) {
-          wl = this.writers.get(Bytes.toBytes(IndexMapReduceUtil.INDEX_DATA_DIR));
-        } else {
-          wl = this.writers.get(family);
-        }
+				WriterLength wl = null;
+				if (indexed) {
+					wl = this.writers.get(Bytes.toBytes(IndexMapReduceUtil.INDEX_DATA_DIR));
+				} else {
+					wl = this.writers.get(family);
+				}
 
-        // If this is a new column family, verify that the directory exists
-        if (wl == null) {
-          if (indexed) {
-            indexFs.mkdirs(new Path(indexDir, Bytes.toString(family)));
-          } else {
-            fs.mkdirs(new Path(outputdir, Bytes.toString(family)));
-          }
-        }
+				// If this is a new column family, verify that the directory
+				// exists
+				if (wl == null) {
+					if (indexed) {
+						indexFs.mkdirs(new Path(indexDir, Bytes.toString(family)));
+					} else {
+						fs.mkdirs(new Path(outputdir, Bytes.toString(family)));
+					}
+				}
 
-        // If any of the HFiles for the column families has reached
-        // maxsize, we need to roll all the writers
-        if (wl != null && wl.written + length >= maxsize) {
-          this.rollRequested = true;
-        }
+				// If any of the HFiles for the column families has reached
+				// maxsize, we need to roll all the writers
+				if (wl != null && wl.written + length >= maxsize) {
+					this.rollRequested = true;
+				}
 
-        // This can only happen once a row is finished though
-        if (rollRequested && Bytes.compareTo(this.previousRow, rowKey) != 0) {
-          rollWriters();
-        }
+				// This can only happen once a row is finished though
+				if (rollRequested && Bytes.compareTo(this.previousRow, rowKey) != 0) {
+					rollWriters();
+				}
 
-        // create a new HLog writer, if necessary
-        if (wl == null || wl.writer == null) {
-          wl = getNewWriter(family, conf, indexed);
-        }
+				// create a new HLog writer, if necessary
+				if (wl == null || wl.writer == null) {
+					wl = getNewWriter(family, conf, indexed);
+				}
 
-        // we now have the proper HLog writer. full steam ahead
-        kv.updateLatestStamp(this.now);
-        trt.includeTimestamp(kv);
-        wl.writer.append(kv);
-        wl.written += length;
+				// we now have the proper HLog writer. full steam ahead
+				kv.updateLatestStamp(this.now);
+				trt.includeTimestamp(kv);
+				wl.writer.append(kv);
+				wl.written += length;
 
-        // Copy the row so we know when a row transition.
-        this.previousRow = rowKey;
-      }
+				// Copy the row so we know when a row transition.
+				this.previousRow = rowKey;
+			}
 
-      private void rollWriters() throws IOException {
-        for (WriterLength wl : this.writers.values()) {
-          if (wl.writer != null) {
-            LOG.info("Writer=" + wl.writer.getPath()
-                + ((wl.written == 0) ? "" : ", wrote=" + wl.written));
-            close(wl.writer);
-          }
-          wl.writer = null;
-          wl.written = 0;
-        }
-        this.rollRequested = false;
-      }
+			private void rollWriters() throws IOException {
+				for (WriterLength wl : this.writers.values()) {
+					if (wl.writer != null) {
+						LOG.info("Writer=" + wl.writer.getPath() + ((wl.written == 0) ? "" : ", wrote=" + wl.written));
+						close(wl.writer);
+					}
+					wl.writer = null;
+					wl.written = 0;
+				}
+				this.rollRequested = false;
+			}
 
-      /*
-       * Create a new HFile.Writer.
-       * @param family
-       * @return A WriterLength, containing a new HFile.Writer.
-       * @throws IOException
-       */
-      private WriterLength getNewWriter(byte[] family, Configuration conf, boolean indexData)
-          throws IOException {
-        WriterLength wl = new WriterLength();
+			/*
+			 * Create a new HFile.Writer.
+			 * 
+			 * @param family
+			 * 
+			 * @return A WriterLength, containing a new HFile.Writer.
+			 * 
+			 * @throws IOException
+			 */
+			private WriterLength getNewWriter(byte[] family, Configuration conf, boolean indexData) throws IOException {
+				WriterLength wl = new WriterLength();
 
-        Path familydir = null;
+				Path familydir = null;
 
-        String compression = compressionMap.get(family);
-        compression = compression == null ? defaultCompression : compression;
+				String compression = compressionMap.get(family);
+				compression = compression == null ? defaultCompression : compression;
 
-        if (indexData) {
-          familydir = new Path(indexDir, Bytes.toString(family));
-          wl.writer =
-              HFile.getWriterFactoryNoCache(conf)
-                  .withPath(indexFs, StoreFile.getUniqueFile(indexFs, familydir))
-                  .withBlockSize(blocksize).withCompression(compression)
-                  .withComparator(KeyValue.KEY_COMPARATOR).withDataBlockEncoder(encoder)
-                  .withChecksumType(Store.getChecksumType(conf))
-                  .withBytesPerChecksum(Store.getBytesPerChecksum(conf)).create();
-          this.writers.put(Bytes.toBytes(IndexMapReduceUtil.INDEX_DATA_DIR), wl);
-        } else {
-          familydir = new Path(outputdir, Bytes.toString(family));
-          wl.writer =
-              HFile.getWriterFactoryNoCache(conf)
-                  .withPath(fs, StoreFile.getUniqueFile(fs, familydir)).withBlockSize(blocksize)
-                  .withCompression(compression).withComparator(KeyValue.KEY_COMPARATOR)
-                  .withDataBlockEncoder(encoder).withChecksumType(Store.getChecksumType(conf))
-                  .withBytesPerChecksum(Store.getBytesPerChecksum(conf)).create();
-          this.writers.put(family, wl);
-        }
+				if (indexData) {
+					familydir = new Path(indexDir, Bytes.toString(family));
+					wl.writer = HFile.getWriterFactoryNoCache(conf)
+							.withPath(indexFs, StoreFile.getUniqueFile(indexFs, familydir)).withBlockSize(blocksize)
+							.withCompression(compression).withComparator(KeyValue.KEY_COMPARATOR)
+							.withDataBlockEncoder(encoder).withChecksumType(Store.getChecksumType(conf))
+							.withBytesPerChecksum(Store.getBytesPerChecksum(conf)).create();
+					this.writers.put(Bytes.toBytes(IndexMapReduceUtil.INDEX_DATA_DIR), wl);
+				} else {
+					familydir = new Path(outputdir, Bytes.toString(family));
+					wl.writer = HFile.getWriterFactoryNoCache(conf).withPath(fs, StoreFile.getUniqueFile(fs, familydir))
+							.withBlockSize(blocksize).withCompression(compression)
+							.withComparator(KeyValue.KEY_COMPARATOR).withDataBlockEncoder(encoder)
+							.withChecksumType(Store.getChecksumType(conf))
+							.withBytesPerChecksum(Store.getBytesPerChecksum(conf)).create();
+					this.writers.put(family, wl);
+				}
 
-        return wl;
-      }
+				return wl;
+			}
 
-      private void close(final HFile.Writer w) throws IOException {
-        if (w != null) {
-          w.appendFileInfo(StoreFile.BULKLOAD_TIME_KEY, Bytes.toBytes(System.currentTimeMillis()));
-          w.appendFileInfo(StoreFile.BULKLOAD_TASK_KEY,
-            Bytes.toBytes(context.getTaskAttemptID().toString()));
-          w.appendFileInfo(StoreFile.MAJOR_COMPACTION_KEY, Bytes.toBytes(true));
-          w.appendFileInfo(StoreFile.EXCLUDE_FROM_MINOR_COMPACTION_KEY,
-            Bytes.toBytes(compactionExclude));
-          w.appendFileInfo(StoreFile.TIMERANGE_KEY, WritableUtils.toByteArray(trt));
-          w.close();
-        }
-      }
+			private void close(final HFile.Writer w) throws IOException {
+				if (w != null) {
+					w.appendFileInfo(StoreFile.BULKLOAD_TIME_KEY, Bytes.toBytes(System.currentTimeMillis()));
+					w.appendFileInfo(StoreFile.BULKLOAD_TASK_KEY, Bytes.toBytes(context.getTaskAttemptID().toString()));
+					w.appendFileInfo(StoreFile.MAJOR_COMPACTION_KEY, Bytes.toBytes(true));
+					w.appendFileInfo(StoreFile.EXCLUDE_FROM_MINOR_COMPACTION_KEY, Bytes.toBytes(compactionExclude));
+					w.appendFileInfo(StoreFile.TIMERANGE_KEY, WritableUtils.toByteArray(trt));
+					w.close();
+				}
+			}
 
-      public void close(TaskAttemptContext c) throws IOException, InterruptedException {
-        for (WriterLength wl : this.writers.values()) {
-          close(wl.writer);
-        }
-      }
-    };
+			public void close(TaskAttemptContext c) throws IOException, InterruptedException {
+				for (WriterLength wl : this.writers.values()) {
+					close(wl.writer);
+				}
+			}
+		};
 
-  }
+	}
 
-  /**
-   * Run inside the task to deserialize column family to compression algorithm map from the
-   * configuration. Package-private for unit tests only.
-   * @return a map from column family to the name of the configured compression algorithm
-   */
-  static Map<byte[], String> createFamilyCompressionMap(Configuration conf) {
-    Map<byte[], String> compressionMap = new TreeMap<byte[], String>(Bytes.BYTES_COMPARATOR);
-    String compressionConf = conf.get(COMPRESSION_CONF_KEY, "");
-    for (String familyConf : compressionConf.split("&")) {
-      String[] familySplit = familyConf.split("=");
-      if (familySplit.length != 2) {
-        continue;
-      }
+	/**
+	 * Run inside the task to deserialize column family to compression algorithm
+	 * map from the configuration. Package-private for unit tests only.
+	 * 
+	 * @return a map from column family to the name of the configured
+	 *         compression algorithm
+	 */
+	static Map<byte[], String> createFamilyCompressionMap(Configuration conf) {
+		Map<byte[], String> compressionMap = new TreeMap<byte[], String>(Bytes.BYTES_COMPARATOR);
+		String compressionConf = conf.get(COMPRESSION_CONF_KEY, "");
+		for (String familyConf : compressionConf.split("&")) {
+			String[] familySplit = familyConf.split("=");
+			if (familySplit.length != 2) {
+				continue;
+			}
 
-      try {
-        compressionMap.put(Bytes.toBytes(URLDecoder.decode(familySplit[0], "UTF-8")),
-          URLDecoder.decode(familySplit[1], "UTF-8"));
-      } catch (UnsupportedEncodingException e) {
-        // will not happen with UTF-8 encoding
-        throw new AssertionError(e);
-      }
-    }
-    return compressionMap;
-  }
+			try {
+				compressionMap.put(Bytes.toBytes(URLDecoder.decode(familySplit[0], "UTF-8")),
+						URLDecoder.decode(familySplit[1], "UTF-8"));
+			} catch (UnsupportedEncodingException e) {
+				// will not happen with UTF-8 encoding
+				throw new AssertionError(e);
+			}
+		}
+		return compressionMap;
+	}
 
-  static class WriterLength {
-    long written = 0;
-    HFile.Writer writer = null;
-  }
+	static class WriterLength {
+		long written = 0;
+		HFile.Writer writer = null;
+	}
 }
