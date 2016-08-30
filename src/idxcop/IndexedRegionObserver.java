@@ -1,4 +1,4 @@
-package main;
+package idxcop;
 
 import java.io.IOException;
 import java.util.List;
