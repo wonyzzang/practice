@@ -20,13 +20,6 @@ public class SingleIndexExpression implements IndexExpression {
 		return indexName;
 	}
 
-	/**
-	 * This is expected to be called in the order of columns specified in the
-	 * Index. If index is on columns cf1:c1, cf1:c2 and cf2:c3 when creating the
-	 * SingleIndexExpression call this method in the same order as of above
-	 * 
-	 * @param equalsExpression
-	 */
 	public void addEqualsExpression(EqualsExpression equalsExpression) {
 		this.equalsExpressions.add(equalsExpression);
 	}
