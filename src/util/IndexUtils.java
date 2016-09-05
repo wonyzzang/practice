@@ -94,7 +94,7 @@ public class IndexUtils {
 	 * @return true when the passed table is a catalog table.
 	 */
 	public static boolean isCatalogTable(byte[] tableName) {
-		if (Bytes.equals(tableName, HConstants.ROOT_TABLE_NAME)
+		if (Bytes.equals(tableName, HConstants.meta)
 				|| Bytes.equals(tableName, HConstants.META_TABLE_NAME)) {
 			return true;
 		}
