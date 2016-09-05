@@ -30,6 +30,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
+import util.IndexUtils;
+
 public class IndexImportTsv {
 
 	final static String NAME = "indeximporttsv";

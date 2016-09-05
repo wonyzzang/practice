@@ -23,6 +23,8 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
+import util.IndexUtils;
+
 public class TableIndexer {
 
 	private static final String TABLE_NAME_TO_INDEX = "tablename.to.index";

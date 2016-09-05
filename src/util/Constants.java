@@ -1,6 +1,5 @@
 package util;
 
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 
 public class Constants {

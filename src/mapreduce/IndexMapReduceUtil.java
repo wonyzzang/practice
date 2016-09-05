@@ -13,6 +13,10 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import util.IndexSpecification;
+import util.IndexUtils;
+import util.IndexedHTableDescriptor;
+
 public class IndexMapReduceUtil {
 
 	public static final String INDEX_DATA_DIR = ".index";

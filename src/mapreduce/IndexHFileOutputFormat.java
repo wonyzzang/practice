@@ -15,6 +15,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.io.hfile.HFile;
 import org.apache.hadoop.hbase.io.hfile.HFileDataBlockEncoder;
@@ -31,6 +32,8 @@ import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import util.Constants;
 
 public class IndexHFileOutputFormat extends FileOutputFormat<ImmutableBytesWritable, KeyValue> {
 
@@ -57,7 +60,7 @@ public class IndexHFileOutputFormat extends FileOutputFormat<ImmutableBytesWrita
 
 		// These configs. are from hbase-*.xml
 		final long maxsize = conf.getLong(HConstants.HREGION_MAX_FILESIZE, HConstants.DEFAULT_MAX_FILE_SIZE);
-		final int blocksize = conf.getInt("hbase.mapreduce.hfileoutputformat.blocksize", HFile.DEFAULT_BLOCKSIZE);
+		final int blocksize = conf.getInt("hbase.mapreduce.hfileoutputformat.blocksize", 65536);
 		// Invented config. Add to hbase-*.xml if other than default
 		// compression.
 		final String defaultCompression = conf.get("hfile.compression", Compression.Algorithm.NONE.getName());
@@ -192,18 +195,13 @@ public class IndexHFileOutputFormat extends FileOutputFormat<ImmutableBytesWrita
 				if (indexData) {
 					familydir = new Path(indexDir, Bytes.toString(family));
 					wl.writer = HFile.getWriterFactoryNoCache(conf)
-							.withPath(indexFs, StoreFile.getUniqueFile(indexFs, familydir)).withBlockSize(blocksize)
-							.withCompression(compression).withComparator(KeyValue.KEY_COMPARATOR)
-							.withDataBlockEncoder(encoder).withChecksumType(Store.getChecksumType(conf))
-							.withBytesPerChecksum(Store.getBytesPerChecksum(conf)).create();
+							.withPath(indexFs, StoreFile.getUniqueFile(indexFs, familydir))
+							.withComparator(KeyValue.COMPARATOR).create();
 					this.writers.put(Bytes.toBytes(IndexMapReduceUtil.INDEX_DATA_DIR), wl);
 				} else {
 					familydir = new Path(outputdir, Bytes.toString(family));
 					wl.writer = HFile.getWriterFactoryNoCache(conf).withPath(fs, StoreFile.getUniqueFile(fs, familydir))
-							.withBlockSize(blocksize).withCompression(compression)
-							.withComparator(KeyValue.KEY_COMPARATOR).withDataBlockEncoder(encoder)
-							.withChecksumType(Store.getChecksumType(conf))
-							.withBytesPerChecksum(Store.getBytesPerChecksum(conf)).create();
+							.withComparator(KeyValue.COMPARATOR).create();
 					this.writers.put(family, wl);
 				}
 

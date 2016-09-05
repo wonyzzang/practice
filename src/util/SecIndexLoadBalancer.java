@@ -16,6 +16,7 @@ import org.apache.hadoop.hbase.ClusterStatus;
 import org.apache.hadoop.hbase.HBaseIOException;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.master.LoadBalancer;
 import org.apache.hadoop.hbase.master.MasterServices;
 import org.apache.hadoop.hbase.master.RegionPlan;
@@ -97,7 +98,8 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 					// Just get the table name from any one of the values in the
 					// regioninfo list
 					if (null == tableName) {
-						tableName = regionInfos.get(0).getTableNameAsString();
+						TableName tn = regionInfos.get(0).getTable();
+						tableName = tn.getNameAsString();
 						regionMap = this.regionLocation.get(tableName);
 					}
 					if (regionMap != null) {
@@ -113,10 +115,12 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 					List<HRegionInfo> idxRegionsToBeMoved = new ArrayList<HRegionInfo>();
 					List<HRegionInfo> uRegionsToBeMoved = new ArrayList<HRegionInfo>();
 					for (HRegionInfo hri : regionsInfos) {
-						if (hri.isMetaRegion() || hri.isRootRegion()) {
+						if (hri.isMetaRegion() || hri.isMetaRegion()) {
 							continue;
 						}
-						tableName = hri.getTableNameAsString();
+						TableName tn = hri.getTable();
+						tableName = tn.getNameAsString();
+						
 						// table name may change every time thats why always
 						// need to get table entries.
 						Map<HRegionInfo, ServerName> regionMap = this.regionLocation.get(tableName);
@@ -146,7 +150,11 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 			List<RegionPlan> regionPlanList = null;
 
 			if (balanceByTable && (false == tableName.endsWith(Constants.INDEX_TABLE_SUFFIX))) {
-				regionPlanList = this.delegator.balanceCluster(clusterState);
+				try {
+					regionPlanList = this.delegator.balanceCluster(clusterState);
+				} catch (HBaseIOException e) {
+					e.printStackTrace();
+				}
 				// regionPlanList is null means skipping balancing.
 				if (null == regionPlanList) {
 					return null;
@@ -171,7 +179,12 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 				List<RegionPlan> regionPlanListCopy = new ArrayList<RegionPlan>(regionPlanList);
 				return prepareIndexPlan(clusterState, indexPlanList, regionPlanListCopy);
 			} else {
-				regionPlanList = this.delegator.balanceCluster(userClusterState);
+				try {
+					regionPlanList = this.delegator.balanceCluster(userClusterState);
+				} catch (HBaseIOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 				if (null == regionPlanList) {
 					regionPlanList = new ArrayList<RegionPlan>(1);
 				} else {
@@ -221,9 +234,10 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 				String actualTableName = null;
 
 				for (HRegionInfo indexRegionInfo : indexRegions) {
-					String indexTableName = indexRegionInfo.getTableNameAsString();
+					TableName tn = indexRegionInfo.getTable();
+					String indexTableName = tn.getNameAsString();
 					actualTableName = extractActualTableName(indexTableName);
-					if (false == hri.getTableNameAsString().equals(actualTableName)) {
+					if (false == hri.getTable().getNameAsString().equals(actualTableName)) {
 						continue;
 					}
 					if (0 != Bytes.compareTo(hri.getStartKey(), indexRegionInfo.getStartKey())) {
@@ -260,7 +274,11 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 		}
 		Map<ServerName, List<HRegionInfo>> bulkPlan = null;
 		if (false == userRegions.isEmpty()) {
-			bulkPlan = this.delegator.roundRobinAssignment(userRegions, servers);
+			try {
+				bulkPlan = this.delegator.roundRobinAssignment(userRegions, servers);
+			} catch (HBaseIOException e) {
+				e.printStackTrace();
+			}
 			if (null == bulkPlan) {
 				return null;
 			}
@@ -274,7 +292,7 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 
 	private void seperateUserAndIndexRegion(HRegionInfo hri, List<HRegionInfo> userRegions,
 			List<HRegionInfo> indexRegions) {
-		if (hri.getTableNameAsString().endsWith(Constants.INDEX_TABLE_SUFFIX)) {
+		if (hri.getTable().getNameAsString().endsWith(Constants.INDEX_TABLE_SUFFIX)) {
 			indexRegions.add(hri);
 			return;
 		}
@@ -293,9 +311,6 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 				bulkPlan = new ConcurrentHashMap<ServerName, List<HRegionInfo>>(1);
 			}
 			for (HRegionInfo hri : indexRegions) {
-				if (LOG.isDebugEnabled()) {
-					LOG.debug("Preparing region plan for index region " + hri.getRegionNameAsString() + '.');
-				}
 				ServerName destServer = getDestServerForIdxRegion(hri);
 				List<HRegionInfo> destServerRegions = null;
 				if (null == destServer) {
@@ -307,9 +322,7 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 						destServerRegions = new ArrayList<HRegionInfo>(1);
 						bulkPlan.put(destServer, destServerRegions);
 					}
-					if (LOG.isDebugEnabled()) {
-						LOG.debug("Server " + destServer + " selected for region " + hri.getRegionNameAsString() + '.');
-					}
+					
 					destServerRegions.add(hri);
 				}
 			}
@@ -321,7 +334,7 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 		// Every time we calculate the table name because in case of master
 		// restart the index regions
 		// may be coming for different index tables.
-		String indexTableName = hri.getTableNameAsString();
+		String indexTableName = hri.getTable().getNameAsString();
 		String actualTableName = extractActualTableName(indexTableName);
 		synchronized (this.regionLocation) {
 			Map<HRegionInfo, ServerName> regionMap = regionLocation.get(actualTableName);
@@ -361,7 +374,11 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 		}
 		Map<ServerName, List<HRegionInfo>> bulkPlan = null;
 		if (false == userRegionsMap.isEmpty()) {
-			bulkPlan = this.delegator.retainAssignment(userRegionsMap, servers);
+			try {
+				bulkPlan = this.delegator.retainAssignment(userRegionsMap, servers);
+			} catch (HBaseIOException e1) {
+				e1.printStackTrace();
+			}
 			if (null == bulkPlan) {
 				return null;
 			}
@@ -376,7 +393,7 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 	private void seperateUserAndIndexRegion(Entry<HRegionInfo, ServerName> e,
 			Map<HRegionInfo, ServerName> userRegionsMap, List<HRegionInfo> indexRegions, List<ServerName> servers) {
 		HRegionInfo hri = e.getKey();
-		if (hri.getTableNameAsString().endsWith(Constants.INDEX_TABLE_SUFFIX)) {
+		if (hri.getTable().getNameAsString().endsWith(Constants.INDEX_TABLE_SUFFIX)) {
 			indexRegions.add(hri);
 			return;
 		}
@@ -389,7 +406,13 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 
 	@Override
 	public Map<HRegionInfo, ServerName> immediateAssignment(List<HRegionInfo> regions, List<ServerName> servers) {
-		return this.delegator.immediateAssignment(regions, servers);
+		Map<HRegionInfo, ServerName> bulkPlan = null;
+		try {
+			bulkPlan = this.delegator.immediateAssignment(regions, servers);
+		} catch (HBaseIOException e) {
+			e.printStackTrace();
+		}
+		return bulkPlan;
 	}
 
 	@Override
@@ -397,7 +420,11 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 		if (regionInfo.isMetaTable()) {
 			// if the region is root or meta table region no need to check for
 			// any region plan.
-			return this.delegator.randomAssignment(regionInfo, servers);
+			try {
+				return this.delegator.randomAssignment(regionInfo, servers);
+			} catch (HBaseIOException e) {
+				e.printStackTrace();
+			}
 		}
 		ServerName sn = null;
 		try {
@@ -416,14 +443,24 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 
 	private ServerName getRandomServer(HRegionInfo regionInfo, List<ServerName> servers) {
 		ServerName sn = null;
-		String tableName = regionInfo.getTableNameAsString();
+		String tableName = regionInfo.getTable().getNameAsString();
 		if (true == IndexUtils.isIndexTable(tableName)) {
 			String actualTableName = extractActualTableName(tableName);
-			sn = this.delegator.randomAssignment(
-					new HRegionInfo(Bytes.toBytes(actualTableName), regionInfo.getStartKey(), regionInfo.getEndKey()),
-					servers);
+			TableName tn = TableName.valueOf(actualTableName);
+			try {
+				sn = this.delegator.randomAssignment(
+						new HRegionInfo(tn, regionInfo.getStartKey(), regionInfo.getEndKey()),
+						servers);
+			} catch (HBaseIOException | IllegalArgumentException e) {
+
+				e.printStackTrace();
+			}
 		} else {
-			sn = this.delegator.randomAssignment(regionInfo, servers);
+			try {
+				sn = this.delegator.randomAssignment(regionInfo, servers);
+			} catch (HBaseIOException e) {
+				e.printStackTrace();
+			}
 		}
 		if (sn == null) {
 			return null;
@@ -436,7 +473,7 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 
 	private ServerName getServerNameFromMap(HRegionInfo regionInfo, List<ServerName> onlineServers)
 			throws IOException, InterruptedException {
-		String tableNameOfCurrentRegion = regionInfo.getTableNameAsString();
+		String tableNameOfCurrentRegion = regionInfo.getTable().getNameAsString();
 		String correspondingTableName = null;
 		if (false == tableNameOfCurrentRegion.endsWith(Constants.INDEX_TABLE_SUFFIX)) {
 			// if the region is user region need to check whether index region
@@ -492,7 +529,7 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 	}
 
 	public void putRegionPlan(HRegionInfo regionInfo, ServerName sn) {
-		String tableName = regionInfo.getTableNameAsString();
+		String tableName = regionInfo.getTable().getNameAsString();
 		synchronized (this.regionLocation) {
 			Map<HRegionInfo, ServerName> regionMap = this.regionLocation.get(tableName);
 			if (null == regionMap) {
@@ -510,7 +547,7 @@ public class SecIndexLoadBalancer implements LoadBalancer {
 	}
 
 	public void clearRegionInfoFromRegionPlan(HRegionInfo regionInfo) {
-		String tableName = regionInfo.getTableNameAsString();
+		String tableName = regionInfo.getTable().getNameAsString();
 		synchronized (this.regionLocation) {
 			Map<HRegionInfo, ServerName> regionMap = this.regionLocation.get(tableName);
 			if (null == regionMap) {

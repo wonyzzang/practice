@@ -60,6 +60,8 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import util.IndexUtils;
+
 /**
  * Tool to load the output of HFileOutputFormat into an existing table.
  * 
@@ -67,7 +69,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  */
 public class IndexLoadIncrementalHFile extends Configured implements Tool {
 
-	private static Log LOG = LogFactory.getLog(IndexLoadIncrementalHFile.class);
 	static AtomicLong regionCount = new AtomicLong(0);
 	private HBaseAdmin hbAdmin;
 	private Configuration cfg;
@@ -123,7 +124,6 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 
 		for (FileStatus stat : familyDirStatuses) {
 			if (!stat.isDir()) {
-				LOG.warn("Skipping non-directory " + stat.getPath());
 				continue;
 			}
 			Path familyDir = stat.getPath();
@@ -178,14 +178,10 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 			int count = 0;
 
 			if (queue.isEmpty()) {
-				LOG.warn("Bulk load operation did not find any files to load in " + "directory " + hfofDir.toUri()
-						+ ".  Does it contain files in " + "subdirectories that correspond to column family names?");
 				return;
 			}
 
 			if (queue.isEmpty()) {
-				LOG.warn("Bulk load operation did not find any files to load in " + "directory " + hfofDir.toUri()
-						+ ".  Does it contain files in " + "subdirectories that correspond to column family names?");
 			}
 
 			// Assumes that region splits can happen while this occurs.
@@ -193,13 +189,10 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 				// need to reload split keys each iteration.
 				final Pair<byte[][], byte[][]> startEndKeys = table.getStartEndKeys();
 				if (count != 0) {
-					LOG.info("Split occured while grouping HFiles, retry attempt " + +count + " with " + queue.size()
-							+ " files remaining to group or split");
 				}
 
 				int maxRetries = cfg.getInt("hbase.bulkload.retries.number", 0);
 				if (maxRetries != 0 && count >= maxRetries) {
-					LOG.error("Retry attempted " + count + " times without completing, bailing out");
 					return;
 				}
 				count++;
@@ -226,7 +219,6 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 				for (LoadQueueItem q : queue) {
 					err.append("  ").append(q.hfilePath).append('\n');
 				}
-				LOG.error(err);
 			}
 		}
 	}
@@ -268,10 +260,10 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 					// TODO Implement bulk load recovery
 					throw new IOException("BulkLoad encountered an unrecoverable problem", t);
 				}
-				LOG.error("Unexpected execution exception during bulk load", e1);
+
 				throw new IllegalStateException(t);
 			} catch (InterruptedException e1) {
-				LOG.error("Unexpected interrupted exception during bulk load", e1);
+
 				throw new IllegalStateException(e1);
 			}
 		}
@@ -313,14 +305,11 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 			} catch (ExecutionException e1) {
 				Throwable t = e1.getCause();
 				if (t instanceof IOException) {
-					LOG.error("IOException during splitting", e1);
 					throw (IOException) t; // would have been thrown if not
 											// parallelized,
 				}
-				LOG.error("Unexpected execution exception during splitting", e1);
 				throw new IllegalStateException(t);
 			} catch (InterruptedException e1) {
-				LOG.error("Unexpected interrupted exception during splitting", e1);
 				throw new IllegalStateException(e1);
 			}
 		}
@@ -340,9 +329,7 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 		// We use a '_' prefix which is ignored when walking directory trees
 		// above.
 		final Path tmpDir = new Path(item.hfilePath.getParent(), "_tmp");
-
-		LOG.info("HFile at " + hfilePath + " no longer fits inside a single " + "region. Splitting...");
-
+		
 		String uniqueName = getUniqueName(table.getTableName());
 		HColumnDescriptor familyDesc = table.getTableDescriptor().getFamily(item.family);
 		Path botOut = new Path(tmpDir, uniqueName + ".bottom");
@@ -355,7 +342,6 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 		lqis.add(new LoadQueueItem(item.family, botOut));
 		lqis.add(new LoadQueueItem(item.family, topOut));
 
-		LOG.info("Successfully split into new HFiles " + botOut + " and " + topOut);
 		return lqis;
 	}
 
@@ -370,7 +356,7 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 					throws IOException {
 		final Path hfilePath = item.hfilePath;
 		final FileSystem fs = hfilePath.getFileSystem(getConf());
-		HFile.Reader hfr = HFile.createReader(fs, hfilePath, new CacheConfig(getConf()));
+		HFile.Reader hfr = HFile.createReader(fs, hfilePath, new CacheConfig(getConf()), getConf());
 		final byte[] first, last;
 		try {
 			hfr.loadFileInfo();
@@ -380,12 +366,10 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 			hfr.close();
 		}
 
-		LOG.info("Trying to load hfile=" + hfilePath + " first=" + Bytes.toStringBinary(first) + " last="
-				+ Bytes.toStringBinary(last));
+
 		if (first == null || last == null) {
 			assert first == null && last == null;
 			// TODO what if this is due to a bad HFile?
-			LOG.info("hfile " + hfilePath + " has no entries, skipping");
 			return null;
 		}
 		if (Bytes.compareTo(first, last) > 0) {
@@ -433,9 +417,7 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 		final ServerCallable<Boolean> svrCallable = new ServerCallable<Boolean>(conn, tableName, first) {
 			@Override
 			public Boolean call() throws Exception {
-				if (LOG.isDebugEnabled()) {
-					LOG.debug("Going to connect to server " + location + " for row " + Bytes.toStringBinary(row));
-				}
+
 				byte[] regionName = location.getRegionInfo().getRegionName();
 				return server.bulkLoadHFiles(famPaths, regionName);
 			}
@@ -445,15 +427,11 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 			List<LoadQueueItem> toRetry = new ArrayList<LoadQueueItem>();
 			boolean success = svrCallable.withRetries();
 			if (!success) {
-				LOG.warn("Attempt to bulk load region containing " + Bytes.toStringBinary(first) + " into table "
-						+ Bytes.toStringBinary(tableName) + " with files " + lqis
-						+ " failed.  This is recoverable and they will be retried.");
 				toRetry.addAll(lqis); // return lqi's to retry
 			}
 			// success
 			return toRetry;
 		} catch (IOException e) {
-			LOG.error("Encountered unrecoverable error from region server", e);
 			throw e;
 		}
 	}
@@ -580,7 +558,6 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 
 		for (FileStatus stat : familyDirStatuses) {
 			if (!stat.isDir()) {
-				LOG.warn("Skipping non-directory " + stat.getPath());
 				continue;
 			}
 			Path familyDir = stat.getPath();
@@ -589,7 +566,6 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 				continue;
 
 			if (familyDir.getName().startsWith(IndexMapReduceUtil.INDEX_DATA_DIR)) {
-				LOG.warn("Ignoring all the HFile specific to " + tableName + " indexed data.");
 				continue;
 			}
 
@@ -602,20 +578,15 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 			for (Path hfile : hfiles) {
 				if (hfile.getName().startsWith("_"))
 					continue;
-				HFile.Reader reader = HFile.createReader(fs, hfile, new CacheConfig(getConf()));
+				HFile.Reader reader = HFile.createReader(fs, hfile, new CacheConfig(getConf()), getConf());
 				final byte[] first, last;
 				try {
 					if (hcd.getCompressionType() != reader.getCompressionAlgorithm()) {
 						hcd.setCompressionType(reader.getCompressionAlgorithm());
-						LOG.info("Setting compression " + hcd.getCompressionType().name() + " for family "
-								+ hcd.toString());
 					}
 					reader.loadFileInfo();
 					first = reader.getFirstRowKey();
 					last = reader.getLastRowKey();
-
-					LOG.info("Trying to figure out region boundaries hfile=" + hfile + " first="
-							+ Bytes.toStringBinary(first) + " last=" + Bytes.toStringBinary(last));
 
 					// To eventually infer start key-end key boundaries
 					Integer value = map.containsKey(first) ? (Integer) map.get(first) : 0;
@@ -632,7 +603,6 @@ public class IndexLoadIncrementalHFile extends Configured implements Tool {
 		keys = IndexLoadIncrementalHFile.inferBoundaries(map);
 		this.hbAdmin.createTable(htd, keys);
 
-		LOG.info("Table " + tableName + " is available!!");
 	}
 
 	@Override

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
@@ -22,6 +23,7 @@ public class IndexCreationMapper extends TableMapper<ImmutableBytesWritable, Mut
 			throws IOException, InterruptedException {
 		byte[] row = key.get();
 		Put put = null;
+
 		for (KeyValue kv : result.raw()) {
 			if (kv.isDelete()) {
 				// Skipping delete records as any way the deletes will mask the

@@ -58,8 +58,8 @@ public class IndexSpecification implements WritableComparable<IndexSpecification
 	}
 
 	private void validateIndexSpecification(byte[] indexSpecName) {
-		// throws IllegalArgException if invalid table name is provided
-		HTableDescriptor.isLegalTableName(indexSpecName);
+		// throws IllegalArgException if invalid table name is p,rovided
+		//HTableDescriptor.isLegalTableName(indexSpecName);
 	}
 
 	/**
@@ -235,14 +235,14 @@ public class IndexSpecification implements WritableComparable<IndexSpecification
 	 */
 	public void readFields(DataInput in) throws IOException {
 		this.name = Bytes.readByteArray(in);
-		try {
-			HTableDescriptor.isLegalTableName(this.name);
-		} catch (IllegalArgumentException e) {
-			String msg = "Received unexpected data while parsing the column qualifiers :" + Bytes.toString(this.name)
-					+ ".";
-			Log.warn(msg + " Could be an non-indexed table.");
-			throw new EOFException(msg);
-		}
+//		try {
+//			HTableDescriptor.isLegalTableName(this.name);
+//		} catch (IllegalArgumentException e) {
+//			String msg = "Received unexpected data while parsing the column qualifiers :" + Bytes.toString(this.name)
+//					+ ".";
+//			Log.warn(msg + " Could be an non-indexed table.");
+//			throw new EOFException(msg);
+//		}
 		int indexColsSize = in.readInt();
 		indexColumns.clear();
 		for (int i = 0; i < indexColsSize; i++) {

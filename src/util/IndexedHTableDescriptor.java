@@ -8,8 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 
@@ -23,10 +21,6 @@ public class IndexedHTableDescriptor extends HTableDescriptor {
 
 	private List<IndexSpecification> indices = new ArrayList<IndexSpecification>(1);
 
-	public IndexedHTableDescriptor() {
-
-	}
-
 	public IndexedHTableDescriptor(String tableName) {
 		super(TableName.valueOf(tableName));
 	}
@@ -35,12 +29,6 @@ public class IndexedHTableDescriptor extends HTableDescriptor {
 		super(TableName.valueOf(tableName));
 	}
 
-	/**
-	 * @param IndexSpecification
-	 *            to be added to indices
-	 * @throws IllegalArgumentException
-	 *             if duplicate indexes for same table
-	 */
 	public void addIndex(IndexSpecification iSpec) throws IllegalArgumentException {
 		String indexName = iSpec.getName();
 		if (null == indexName) {
@@ -63,17 +51,10 @@ public class IndexedHTableDescriptor extends HTableDescriptor {
 		indices.add(iSpec);
 	}
 
-	/**
-	 * @return IndexSpecification list
-	 */
 	public List<IndexSpecification> getIndices() {
 		return (new ArrayList<IndexSpecification>(this.indices));
 	}
 
-	/**
-	 * @param DataOutput
-	 *            stream
-	 */
 	public void write(DataOutput out) throws IOException {
 		super.write(out);
 		out.writeInt(this.indices.size());
@@ -82,11 +63,6 @@ public class IndexedHTableDescriptor extends HTableDescriptor {
 		}
 	}
 
-	/**
-	 * @param DataInput
-	 *            stream
-	 * @throws IOException
-	 */
 	public void readFields(DataInput in) throws IOException {
 		try {
 			super.readFields(in);
