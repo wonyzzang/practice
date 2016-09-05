@@ -7,6 +7,10 @@ import java.util.Map;
 
 import org.apache.hadoop.hbase.util.Pair;
 
+import util.Column;
+import util.GroupingCondition;
+import util.IndexSpecification;
+
 public class NonLeafFilterNode implements FilterNode {
 
 	private List<FilterNode> filterNodes = new ArrayList<FilterNode>();

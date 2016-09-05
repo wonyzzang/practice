@@ -27,6 +27,24 @@ import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
+import client.EqualsExpression;
+import client.IndexExpression;
+import client.IndexUtils;
+import client.MultiIndexExpression;
+import client.NoIndexExpression;
+import client.RangeExpression;
+import client.SingleIndexExpression;
+import filter.SingleColumnRangeFilter;
+import filter.SingleColumnValuePartitionFilter;
+import manager.IndexManager;
+import util.ByteArrayBuilder;
+import util.Column;
+import util.ColumnQualifier;
+import util.Constants;
+import util.GroupingCondition;
+import util.IndexSpecification;
+import util.ValuePartition;
+
 public class ScanFilterEvaluator {
 
 	private static final Log LOG = LogFactory.getLog(ScanFilterEvaluator.class);
@@ -71,7 +89,7 @@ public class ScanFilterEvaluator {
 		if (indexExpBytes != null) {
 			// Which index(s) to be used is already passed by the user.
 			try {
-				IndexExpression indexExpression = org.apache.hadoop.hbase.index.client.IndexUtils
+				IndexExpression indexExpression = IndexUtils
 						.toIndexExpression(indexExpBytes);
 				if (indexExpression instanceof NoIndexExpression) {
 					// Client side says not to use any index for this Scan.

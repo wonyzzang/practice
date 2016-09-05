@@ -8,6 +8,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hbase.util.Bytes;
 
+import util.ByteArrayBuilder;
+import util.IndexSpecification;
+import util.IndexUtils;
+
 /**
  * IndexManager manages the index details of each table.
  */

@@ -51,7 +51,15 @@ public class ReInitializableRegionScannerImpl implements ReInitializableRegionSc
 
 	@Override
 	public boolean isFilterDone() {
-		return this.delegator.isFilterDone();
+		boolean isDone = false;
+		
+		try {
+			isDone = this.delegator.isFilterDone();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return isDone;
 	}
 
 	@Override
@@ -65,7 +73,7 @@ public class ReInitializableRegionScannerImpl implements ReInitializableRegionSc
 	}
 
 	@Override
-	public synchronized boolean next(List<KeyValue> results) throws IOException {
+	public synchronized boolean next(List<Cell> results) throws IOException {
 		return next(results, this.batch);
 	}
 
@@ -74,7 +82,7 @@ public class ReInitializableRegionScannerImpl implements ReInitializableRegionSc
 	}
 
 	@Override
-	public synchronized boolean next(List<KeyValue> result, int limit) throws IOException {
+	public synchronized boolean next(List<Cell> result, int limit) throws IOException {
 		return next(result, limit, null);
 	}
 

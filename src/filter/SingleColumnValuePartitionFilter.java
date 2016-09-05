@@ -1,6 +1,7 @@
 package filter;
 
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -19,6 +20,12 @@ public class SingleColumnValuePartitionFilter extends SingleColumnValueFilter {
 		super(family, qualifier, compareOp, value);
 		this.valuePartition = vp;
 	}
+	
+	public SingleColumnValuePartitionFilter(final byte[] family, final byte[] qualifier,
+		      final CompareOp compareOp, final ByteArrayComparable comparator, ValuePartition vp) {
+		    super(family, qualifier, compareOp, comparator);
+		    this.valuePartition = vp;
+		  }
 
 	public ValuePartition getValuePartition() {
 		return valuePartition;

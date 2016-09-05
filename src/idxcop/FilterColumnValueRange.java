@@ -3,6 +3,9 @@ package idxcop;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import util.Column;
+import util.ValuePartition;
+
 public class FilterColumnValueRange extends FilterColumnValueDetail {
 	private CompareOp upperBoundCompareOp;
 	private byte[] upperBoundValue;

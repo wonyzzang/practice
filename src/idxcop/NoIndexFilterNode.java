@@ -5,6 +5,9 @@ import java.util.Map;
 
 import org.apache.hadoop.hbase.util.Pair;
 
+import util.Column;
+import util.IndexSpecification;
+
 public class NoIndexFilterNode implements FilterNode {
 
 	@Override

@@ -36,6 +36,7 @@ import org.apache.hadoop.hbase.master.AssignmentManager;
 import org.apache.hadoop.hbase.master.HMaster;
 import org.apache.hadoop.hbase.master.MasterServices;
 import org.apache.hadoop.hbase.master.RegionPlan;
+import org.apache.hadoop.hbase.master.RegionState;
 import org.apache.hadoop.hbase.master.handler.CreateTableHandler;
 import org.apache.hadoop.hbase.master.handler.DisableTableHandler;
 import org.apache.hadoop.hbase.master.handler.EnableTableHandler;
@@ -44,6 +45,14 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSTableDescriptors;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Pair;
+
+import manager.IndexManager;
+import util.Column;
+import util.ColumnQualifier.ValueType;
+import util.Constants;
+import util.IndexSpecification;
+import util.IndexUtils;
+import util.IndexedHTableDescriptor;
 
 /**
  * Defines of coprocessor hooks(to support secondary indexing) of operations on
@@ -264,7 +273,7 @@ public class IndexMasterObserver extends BaseMasterObserver implements MasterObs
 	private HRegionInfo[] getHRegionInfos(HTableDescriptor hTableDescriptor, byte[][] splitKeys) {
 		HRegionInfo[] hRegionInfos = null;
 		if (splitKeys == null || splitKeys.length == 0) {
-			hRegionInfos = new HRegionInfo[] { new HRegionInfo(hTableDescriptor.getName(), null, null) };
+			hRegionInfos = new HRegionInfo[] { new HRegionInfo(hTableDescriptor.getTableName(), null, null) };
 		} else {
 			int numRegions = splitKeys.length + 1;
 			hRegionInfos = new HRegionInfo[numRegions];
@@ -272,7 +281,7 @@ public class IndexMasterObserver extends BaseMasterObserver implements MasterObs
 			byte[] endKey = null;
 			for (int i = 0; i < numRegions; i++) {
 				endKey = (i == splitKeys.length) ? null : splitKeys[i];
-				hRegionInfos[i] = new HRegionInfo(hTableDescriptor.getName(), startKey, endKey);
+				hRegionInfos[i] = new HRegionInfo(hTableDescriptor.getTableName(), startKey, endKey);
 				startKey = endKey;
 			}
 		}
@@ -295,7 +304,7 @@ public class IndexMasterObserver extends BaseMasterObserver implements MasterObs
 			throws IOException {
 		LOG.info("Entering into postAssign of region " + regionInfo.getRegionNameAsString() + '.');
 
-		if (false == regionInfo.getTableNameAsString().endsWith(Constants.INDEX_TABLE_SUFFIX)) {
+		if (false == regionInfo.getTable().getNameAsString().endsWith(Constants.INDEX_TABLE_SUFFIX)) {
 			MasterServices master = ctx.getEnvironment().getMasterServices();
 			AssignmentManager am = master.getAssignmentManager();
 			// waiting until user region is removed from transition.
@@ -358,7 +367,7 @@ public class IndexMasterObserver extends BaseMasterObserver implements MasterObs
 		MasterServices master = ctx.getEnvironment().getMasterServices();
 		AssignmentManager am = master.getAssignmentManager();
 		boolean isRegionInTransition = false;
-		String tableName = hri.getTableNameAsString();
+		String tableName = hri.getTable().getNameAsString();
 		if (false == IndexUtils.isIndexTable(tableName)) {
 			NavigableMap<String, RegionState> regionsInTransition = am.getRegionsInTransition();
 			RegionState regionState = regionsInTransition.get(hri.getEncodedName());
@@ -368,7 +377,7 @@ public class IndexMasterObserver extends BaseMasterObserver implements MasterObs
 				String indexTableName = IndexUtils.getIndexTableName(tableName);
 				for (Entry<String, RegionState> region : regionsInTransition.entrySet()) {
 					HRegionInfo regionInfo = region.getValue().getRegion();
-					if (indexTableName.equals(regionInfo.getTableNameAsString())) {
+					if (indexTableName.equals(regionInfo.getTable().getNameAsString())) {
 						if (Bytes.compareTo(hri.getStartKey(), regionInfo.getStartKey()) == 0) {
 							isRegionInTransition = true;
 							break;
@@ -401,7 +410,7 @@ public class IndexMasterObserver extends BaseMasterObserver implements MasterObs
 					LOG.debug("Interrupted while region in assignment.");
 				}
 			}
-			String indexTableName = IndexUtils.getIndexTableName(regionInfo.getTableNameAsString());
+			String indexTableName = IndexUtils.getIndexTableName(regionInfo.getTable().getNameAsString());
 			List<HRegionInfo> tableRegions = am.getRegionsOfTable(Bytes.toBytes(indexTableName));
 			for (HRegionInfo indexRegionInfo : tableRegions) {
 				if (0 == Bytes.compareTo(indexRegionInfo.getStartKey(), regionInfo.getStartKey())) {

@@ -15,6 +15,10 @@ import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import manager.IndexManager;
+import util.IndexSpecification;
+import util.IndexUtils;
+
 public class IndexWALObserver implements WALObserver {
 
 	private static final Log LOG = LogFactory.getLog(IndexWALObserver.class);
@@ -24,7 +28,7 @@ public class IndexWALObserver implements WALObserver {
 	@Override
 	public boolean preWALWrite(ObserverContext<WALCoprocessorEnvironment> ctx, HRegionInfo info, HLogKey logKey,
 			WALEdit logEdit) throws IOException {
-		String tableNameStr = info.getTableNameAsString();
+		String tableNameStr = info.getTable().getNameAsString();
 		if (IndexUtils.isCatalogTable(info.getTableName()) || IndexUtils.isIndexTable(tableNameStr)) {
 			return true;
 		}

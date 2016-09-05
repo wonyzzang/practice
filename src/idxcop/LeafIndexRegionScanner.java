@@ -5,18 +5,19 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 
-public class LeafIndexRegionScanner implements IndexRegionScanner {
+import util.IndexSpecification;
 
-	private static final Log LOG = LogFactory.getLog(LeafIndexRegionScanner.class);
+public class LeafIndexRegionScanner implements IndexRegionScanner {
 
 	private RegionScanner delegator = null;
 
-	private KeyValue currentKV = null;
+	private Cell currentKV = null;
 
 	private boolean hadMore = true;
 
@@ -47,7 +48,14 @@ public class LeafIndexRegionScanner implements IndexRegionScanner {
 
 	@Override
 	public boolean isFilterDone() {
-		return this.delegator.isFilterDone();
+		boolean isDone = false;
+		try {
+			isDone = this.delegator.isFilterDone();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return isDone;
 	}
 
 	@Override
@@ -101,7 +109,7 @@ public class LeafIndexRegionScanner implements IndexRegionScanner {
 	}
 
 	@Override
-	public synchronized boolean next(List<KeyValue> results) throws IOException {
+	public synchronized boolean next(List<Cell> results) throws IOException {
 		boolean hasMore = false;
 		do {
 			// this check here will prevent extra next call when in the previous
@@ -113,10 +121,9 @@ public class LeafIndexRegionScanner implements IndexRegionScanner {
 				return false;
 			hasMore = this.delegator.next(results);
 			if (results != null && results.size() > 0) {
-				KeyValue kv = results.get(0);
+				Cell kv = results.get(0);
 				if (this.ttlExpiryChecker.checkIfTTLExpired(this.index.getTTL(), kv.getTimestamp())) {
 					results.clear();
-					LOG.info("The ttl has expired for the kv " + kv);
 				} else {
 					if (!isRangeScanner) {
 						// This is need to reseek in case of EQUAL scanners.

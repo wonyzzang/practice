@@ -6,6 +6,9 @@ import java.util.Map;
 
 import org.apache.hadoop.hbase.util.Pair;
 
+import util.Column;
+import util.IndexSpecification;
+
 public class PossibleIndexFilterNode implements LeafFilterNode {
 
 	private List<Pair<IndexSpecification, Integer>> possibleFutureUseIndices;

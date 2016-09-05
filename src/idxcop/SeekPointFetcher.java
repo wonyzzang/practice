@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -31,7 +32,7 @@ public class SeekPointFetcher {
 	 */
 	public synchronized boolean nextSeekPoints(List<byte[]> seekPoints, int noOfSeekPoints) throws IOException {
 		boolean hasMore = true;
-		List<KeyValue> indexScanResult = new ArrayList<KeyValue>();
+		List<Cell> indexScanResult = new ArrayList<Cell>();
 		for (int i = 0; i < noOfSeekPoints; i++) {
 			hasMore = indexRegionScanner.next(indexScanResult);
 			if (indexScanResult.size() > 0) {

@@ -9,15 +9,17 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.regionserver.ScannerContext;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
+import client.IndexUtils;
+
 public class IndexRegionScannerForAND implements IndexRegionScanner {
-
-	private static final Log LOG = LogFactory.getLog(IndexRegionScannerForAND.class);
-
+	
 	private List<IndexRegionScanner> scanners = null;
 
 	private Map<String, Pair<List<Boolean>, Integer>> rowCache = new HashMap<String, Pair<List<Boolean>, Integer>>();
@@ -98,14 +100,14 @@ public class IndexRegionScannerForAND implements IndexRegionScanner {
 	}
 
 	@Override
-	public synchronized boolean next(List<KeyValue> results) throws IOException {
+	public synchronized boolean next(List<Cell> results) throws IOException {
 		if (this.scanners != null && !this.scanners.isEmpty()) {
 			List<Pair<byte[], IndexRegionScanner>> valueList = new ArrayList<Pair<byte[], IndexRegionScanner>>();
 			byte[] maxRowKey = null;
 			while (results.size() < 1) {
-				List<KeyValue> intermediateResult = new ArrayList<KeyValue>();
+				List<Cell> intermediateResult = new ArrayList<Cell>();
 				boolean haveSameRows = true;
-				KeyValue kv = null;
+				Cell kv = null;
 				Iterator<IndexRegionScanner> scnItr = this.scanners.iterator();
 				while (scnItr.hasNext()) {
 					IndexRegionScanner scn = scnItr.next();
@@ -141,9 +143,6 @@ public class IndexRegionScannerForAND implements IndexRegionScanner {
 						}
 					}
 					if (!hasMore) {
-						if (LOG.isDebugEnabled()) {
-							LOG.debug("Removing scanner " + scn + " from the list.");
-						}
 						scn.close();
 						scnItr.remove();
 						if (hasRangeScanners) {
@@ -304,6 +303,36 @@ public class IndexRegionScannerForAND implements IndexRegionScanner {
 	@Override
 	public boolean next(List<KeyValue> result, int limit, String metric) throws IOException {
 		// TODO Implement InternalScanner.next
+		return false;
+	}
+
+	@Override
+	public int getBatch() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public long getMaxResultSize() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public boolean nextRaw(List<Cell> arg0) throws IOException {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean nextRaw(List<Cell> arg0, ScannerContext arg1) throws IOException {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean next(List<Cell> arg0, ScannerContext arg1) throws IOException {
+		// TODO Auto-generated method stub
 		return false;
 	}
 

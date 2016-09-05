@@ -3,6 +3,10 @@ package idxcop;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import util.Column;
+import util.ColumnQualifier.ValueType;
+import util.ValuePartition;
+
 public class FilterColumnValueDetail {
 	protected byte[] cf;
 	protected byte[] qualifier;

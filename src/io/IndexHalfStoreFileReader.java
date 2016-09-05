@@ -3,8 +3,10 @@ package io;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValue.Type;
@@ -44,9 +46,9 @@ public class IndexHalfStoreFileReader extends StoreFile.Reader {
 	 * @param r
 	 * @throws IOException
 	 */
-	public IndexHalfStoreFileReader(final FileSystem fs, final Path p, final CacheConfig cacheConf, final Reference r,
+	public IndexHalfStoreFileReader(final FileSystem fs, final Path p, final CacheConfig cacheConf, Configuration conf, final Reference r,
 			DataBlockEncoding preferredEncodingInCache) throws IOException {
-		super(fs, p, cacheConf, preferredEncodingInCache);
+		super(fs, p, cacheConf, conf);
 		this.splitkey = r.getSplitKey();
 		// Is it top or bottom half?
 		this.top = Reference.isTopFileRegion(r.getFileRegion());
@@ -309,6 +311,30 @@ public class IndexHalfStoreFileReader extends StoreFile.Reader {
 			// TODO: Need to change as per IndexHalfStoreFileReader
 			public boolean isSeeked() {
 				return this.delegate.isSeeked();
+			}
+
+			@Override
+			public Cell getNextIndexedKey() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public int reseekTo(Cell arg0) throws IOException {
+				// TODO Auto-generated method stub
+				return 0;
+			}
+
+			@Override
+			public boolean seekBefore(Cell arg0) throws IOException {
+				// TODO Auto-generated method stub
+				return false;
+			}
+
+			@Override
+			public int seekTo(Cell arg0) throws IOException {
+				// TODO Auto-generated method stub
+				return 0;
 			}
 		};
 	}

@@ -7,6 +7,9 @@ import java.util.Map;
 
 import org.apache.hadoop.hbase.util.Pair;
 
+import util.Column;
+import util.IndexSpecification;
+
 public class IndexFilterNode implements LeafFilterNode {
 
 	private IndexSpecification indexToUse;

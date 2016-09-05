@@ -17,6 +17,11 @@ import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
+import filter.SingleColumnRangeFilter;
+import filter.SingleColumnValuePartitionFilter;
+import util.Column;
+import util.ValuePartition;
+
 /**
  * This class does the grouping work for different filterlists. Like if we i
  * have 3 different filter list and all have MUST_PASS_ALL condition finally

@@ -12,14 +12,13 @@ import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
 public class IndexRegionScannerForOR implements IndexRegionScanner {
-
-	private static final Log LOG = LogFactory.getLog(IndexRegionScannerForOR.class);
 
 	private List<IndexRegionScanner> scanners = null;
 
@@ -141,9 +140,9 @@ public class IndexRegionScannerForOR implements IndexRegionScanner {
 	}
 
 	@Override
-	public synchronized boolean next(List<KeyValue> results) throws IOException {
+	public synchronized boolean next(List<Cell> results) throws IOException {
 		OUTER: while (results.size() < 1) {
-			List<KeyValue> intermediateResult = new ArrayList<KeyValue>();
+			List<Cell> intermediateResult = new ArrayList<Cell>();
 			if (hasRangeScanners || firstScan || reseeked) {
 				Iterator<IndexRegionScanner> scnItr = this.scanners.iterator();
 				INNER: while (scnItr.hasNext()) {
@@ -170,15 +169,12 @@ public class IndexRegionScannerForOR implements IndexRegionScanner {
 								// Allow other scanners to scan. Nothing to do.
 							} else {
 								valueMap.put(rowKeyFromKV,
-										new Pair<IndexRegionScanner, KeyValue>(scn, intermediateResult.get(0)));
+										new Pair<IndexRegionScanner,Cell>(scn, intermediateResult.get(0)));
 								intermediateResult.clear();
 							}
 						}
 					}
 					if (!hasMore) {
-						if (LOG.isDebugEnabled()) {
-							LOG.debug("Removing scanner " + scn + " from the list.");
-						}
 						scn.close();
 						scnItr.remove();
 					}
@@ -233,7 +229,7 @@ public class IndexRegionScannerForOR implements IndexRegionScanner {
 						}
 						if (rowKeyFromKV != null) {
 							valueMap.put(rowKeyFromKV,
-									new Pair<IndexRegionScanner, KeyValue>(scn, intermediateResult.get(0)));
+									new Pair<IndexRegionScanner, Cell>(scn, intermediateResult.get(0)));
 							intermediateResult.clear();
 						}
 					}
@@ -250,10 +246,7 @@ public class IndexRegionScannerForOR implements IndexRegionScanner {
 				return false;
 			}
 		}
-		if (LOG.isDebugEnabled()) {
-			LOG.debug(results.size() + " seek points obtained. Values: "
-					+ (!results.isEmpty() ? Bytes.toString(results.get(0).getRow()) : 0));
-		}
+		
 		return !results.isEmpty();
 	}
 

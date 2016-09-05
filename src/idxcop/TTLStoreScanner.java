@@ -18,6 +18,11 @@ import org.apache.hadoop.hbase.regionserver.Store;
 import org.apache.hadoop.hbase.regionserver.StoreScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import manager.IndexManager;
+import util.ByteArrayBuilder;
+import util.IndexSpecification;
+import util.IndexUtils;
+
 public class TTLStoreScanner implements InternalScanner {
 	private InternalScanner delegate;
 	private Store store;
@@ -48,12 +53,12 @@ public class TTLStoreScanner implements InternalScanner {
 	}
 
 	@Override
-	public boolean next(List<KeyValue> results) throws IOException {
+	public boolean next(List<Cell> results) throws IOException {
 		return this.next(results, 1);
 	}
 
 	@Override
-	public boolean next(List<KeyValue> result, int limit) throws IOException {
+	public boolean next(List<Cell> result, int limit) throws IOException {
 		boolean next = this.delegate.next(result, limit);
 		// Ideally here i should get only one result(i.e) only one kv
 		for (Iterator<KeyValue> iterator = result.iterator(); iterator.hasNext();) {
